@@ -73,6 +73,10 @@ contract Dex is IDex, ERC20 {
         return outputAmount;
     }
 
+    receive() external payable {
+        revert("This contract does not accept ETH Only ERC20 tokens");
+    }
+
     /**
      * @dev overflow? check?
      * @param x 제곱근을 구할 숫자
