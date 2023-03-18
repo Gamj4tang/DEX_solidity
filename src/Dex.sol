@@ -60,10 +60,31 @@ contract Dex is IDex, ERC20 {
         return lpTokenCreated;
     }
 
+    /**
+     * @dev ERC-20 기반 LP 토큰을 사용해야 합니다. 수수료 수입과 Pool에 기부된 금액을 제외하고는 더 많은 토큰을 회수할 수 있는 취약점이 없어야 합니다. Concentrated Liquidity는 필요 없습니다.
+     * @param LPTokenAmount 공급 받은 LP 토큰의 수량
+     * @param minimumTokenXAmount 최소 토큰 X의 수량
+     * @param minimumTokenYAmount 최소 토큰 Y의 수량
+     * @return 토큰 공급량 
+     * @return 
+     */
     function removeLiquidity(uint LPTokenAmount, uint minimumTokenXAmount, uint minimumTokenYAmount) external override returns (uint, uint) {
-        uint tokenXAmount = 0x1337;
-        uint tokenYAmount = 0x1337;
+        require(LPTokenAmount > 0, "Amounts must be greater than zero.");    // @Gamj4tang ✅ test
+        require(liquidity[msg.sender] >= LPTokenAmount, "Insufficient liquidity."); // @Gamj4tang ✅ test
 
+        uint tokenXAmount = LPTokenAmount * tokenX.balanceOf(address(this)) / totalLiquidity; // $(\sqrt{(t_x * t_y)} *t_x) / total(t_x) = LP_x$ => 토큰 페어 검증 조건 성립, 계산
+        uint tokenYAmount = LPTokenAmount * tokenY.balanceOf(address(this)) / totalLiquidity; // $t_x = (LP*total_{t_x}) / LP_f)$, $t_y = (LP*total_{t_y}) / LP_f)$
+        require(tokenXAmount >= minimumTokenXAmount && tokenYAmount >= minimumTokenYAmount, "Minimum liquidity not met."); // @Gamj4tang ✅ test
+
+        liquidity[msg.sender] -= LPTokenAmount; // @Gamj4tang 사용자 유동성 추적 상태 업데이트
+        totalLiquidity -= LPTokenAmount;    // 전체 유동성 업데이트
+
+        tokenX.transfer(msg.sender, tokenXAmount);
+        tokenY.transfer(msg.sender, tokenYAmount);
+
+        _burn(msg.sender, LPTokenAmount);
+        emit RemoveLiquidity(msg.sender, tokenXAmount, tokenYAmount);
+        
         return (tokenXAmount, tokenYAmount);
     }
 
