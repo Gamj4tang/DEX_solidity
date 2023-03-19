@@ -45,7 +45,8 @@ contract Dex is IDex, ERC20 {
         uint liquidityY;
 
         if (totalLiquidity == 0) {
-            lpTokenCreated = _sqrt(tokenXAmount * tokenYAmount) * TOKEN_DECIMALS; // @Gamj4tang CPMM 모델 기반 a:b = b:√(a*b), 따로 유틸 로?
+            // 정밀도 
+            lpTokenCreated = _sqrt(tokenXAmount * tokenYAmount); // @Gamj4tang CPMM 모델 기반 a:b = b:√(a*b), 따로 유틸 로?
             require(lpTokenCreated >= tokenMinimumOutputAmount, "Minimum liquidity not met."); // @Gamj4tang ✅ test
             totalLiquidity = lpTokenCreated;
         } else {
@@ -54,17 +55,18 @@ contract Dex is IDex, ERC20 {
                 tokenYReserve = tokenY.balanceOf(address(this));
             
                 // @Gamj4tang 정수 취약성 추가 검중?, 유동성 비례 b:√(a*b) 계산 
+                // L_x = X*P_x, L_y = Y*P_y (유동성 가치의 토큰 가치 비례) => P_x = L_x/X
                 liquidityX = _div(_mul(tokenXAmount, totalLiquidity), tokenXReserve);
                 liquidityY = _div(_mul(tokenYAmount, totalLiquidity), tokenYReserve);
-                console.log("liquidityX: %s", liquidityX);  
-                console.log("liquidityY: %s", liquidityY);
+                // console.log("liquidityX: %s", liquidityX);  
+                // console.log("liquidityY: %s", liquidityY);
             }
             // 최소 수량 유동성 공급 검증
             lpTokenCreated = (liquidityX < liquidityY) ? liquidityX : liquidityY;
             require(lpTokenCreated >= tokenMinimumOutputAmount, "Minimum liquidity not met."); // @Gamj4tang ✅ test
             totalLiquidity += lpTokenCreated;
         }
-        console.log("lpTokenCreated: %s", lpTokenCreated);
+        // console.log("lpTokenCreated: %s", lpTokenCreated);
 
         liquidity[msg.sender] += lpTokenCreated;
         tokenX.transferFrom(msg.sender, address(this), tokenXAmount);
@@ -87,7 +89,7 @@ contract Dex is IDex, ERC20 {
     function removeLiquidity(uint LPTokenAmount, uint minimumTokenXAmount, uint minimumTokenYAmount) external override returns (uint, uint) {
         require(LPTokenAmount > 0, "Amounts must be greater than zero.");    // @Gamj4tang ✅ test
         require(liquidity[msg.sender] >= LPTokenAmount, "Insufficient liquidity."); // @Gamj4tang ✅ test
-
+        // 유동성 기반 토큰 가격, => P_x = L_x/X ,  P_y = L_y/Y 
         uint tokenXAmount = _div(_mul(LPTokenAmount, tokenX.balanceOf(address(this))), totalLiquidity); // $(\sqrt{(t_x * t_y)} *t_x) / total(t_x) = LP_x$ => 토큰 페어 검증 조건 성립, 계산
         uint tokenYAmount = _div(_mul(LPTokenAmount, tokenY.balanceOf(address(this))), totalLiquidity); // $t_x = (LP*total_{t_x}) / LP_f)$, $t_y = (LP*total_{t_y}) / LP_f)$
         require(tokenXAmount >= minimumTokenXAmount && tokenYAmount >= minimumTokenYAmount, "Minimum liquidity not met."); // @Gamj4tang ✅ test
@@ -133,17 +135,17 @@ contract Dex is IDex, ERC20 {
             inputToken = tokenY;
             outputToken = tokenX;
         }
+        // 
         uint inputReserve = inputToken.balanceOf(address(this));
         uint outputReserve = outputToken.balanceOf(address(this));
 
         // Protocol Fee: 0.1% check (Pi = 0.1% ( = 10 bp) = ø = 0.999 = 99.9% )
         uint amountInMulFee = _mul(inputAmount, (999));
-        console.log("amountInMulFee: %s", amountInMulFee);
+        // console.log("amountInMulFee: %s", amountInMulFee);
         uint nm = _mul(amountInMulFee, (outputReserve));
         uint dm = _add(_mul(inputReserve, 1000), amountInMulFee);
-        console.log("nm: %s", nm);
-
-        console.log("dm: %s", dm);
+        // console.log("nm: %s", nm);
+        // console.log("dm: %s", dm);
 
         outputAmount = _div(nm, dm);
 
