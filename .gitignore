@@ -3,5 +3,5 @@ out/
 cache/
 node_modules/
 .env
-lib/
+#lib/
 artifacts/

@@ -45,7 +45,7 @@ contract Dex is IDex, ERC20 {
         uint liquidityY;
 
         if (totalLiquidity == 0) {
-            lpTokenCreated = _sqrt(tokenXAmount * tokenYAmount); // @Gamj4tang CPMM 모델 기반 a:b = b:√(a*b), 따로 유틸 로?
+            lpTokenCreated = _sqrt(tokenXAmount * tokenYAmount) * TOKEN_DECIMALS; // @Gamj4tang CPMM 모델 기반 a:b = b:√(a*b), 따로 유틸 로?
             require(lpTokenCreated >= tokenMinimumOutputAmount, "Minimum liquidity not met."); // @Gamj4tang ✅ test
             totalLiquidity = lpTokenCreated;
         } else {
@@ -142,7 +142,7 @@ contract Dex is IDex, ERC20 {
         uint nm = _mul(amountInMulFee, (outputReserve));
         uint dm = _add(_mul(inputReserve, 1000), amountInMulFee);
         console.log("nm: %s", nm);
-        
+
         console.log("dm: %s", dm);
 
         outputAmount = _div(nm, dm);
@@ -162,7 +162,7 @@ contract Dex is IDex, ERC20 {
      * @param lpAmount : 유동성 토큰의 수량
      */
     function transfer(address to, uint256 lpAmount) public override(ERC20, IDex) returns (bool) {
-        _mint(msg.sender, lpAmount);
+        _mint(to, lpAmount);
         return true;
     }
 
