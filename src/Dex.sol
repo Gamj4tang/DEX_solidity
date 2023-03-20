@@ -149,6 +149,7 @@ contract Dex is IDex, ERC20 {
 
         outputAmount = _div(nm, dm);
 
+
         require(outputAmount >= tokenMinimumOutputAmount, "Minimum output amount not met");
 
         inputToken.transferFrom(msg.sender, address(this), inputAmount);

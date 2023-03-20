@@ -251,4 +251,31 @@ contract DexTest is Test {
         assertEq(rx, 5000 ether, "rx failed");
         assertEq(ry, 4000 ether, "ry failed");
     }
+    function testAddLiquidity8() external {
+        tokenX.transfer(address(dex), 1000 ether);
+        uint lp = dex.addLiquidity(3000 ether, 4000 ether, 0);
+        emit log_named_uint("LP", lp);
+
+        tokenX.transfer(address(dex), 1000 ether);
+        uint lp2 = dex.addLiquidity(5000 ether, 4000 ether, 0);
+        emit log_named_uint("LP", lp);
+
+
+        address other_eoa = vm.addr(1);
+        tokenX.transfer(other_eoa, 10000 ether);
+        tokenY.transfer(other_eoa, 10000 ether);
+        vm.startPrank(other_eoa);
+
+        tokenX.approve(address(dex), type(uint).max);
+        tokenY.approve(address(dex), type(uint).max);
+
+        uint lp3 = dex.addLiquidity(5000 ether, 4000 ether, 0);
+        emit log_named_uint("LP3", lp3);
+
+        vm.stopPrank();
+
+        (uint rx, uint ry) = dex.removeLiquidity(lp, 0, 0);
+        assertEq(rx, 5000 ether, "rx failed");
+        assertEq(ry, 4000 ether, "ry failed");
+    }
 }
