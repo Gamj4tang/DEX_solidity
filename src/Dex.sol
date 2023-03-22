@@ -5,6 +5,7 @@ pragma solidity ^0.8.13;
 import "./interfaces/IDex.sol";
 import "forge-std/console.sol";
 import "openzeppelin-contracts/token/ERC20/ERC20.sol";
+import "openzeppelin-contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title DEX STUDY
@@ -12,7 +13,7 @@ import "openzeppelin-contracts/token/ERC20/ERC20.sol";
  * @notice CPMM (xy=k) 방식의 AMM을 사용하는 DEX를 구현하세요.
  * 
  */
-contract Dex is IDex, ERC20 {
+contract Dex is IDex, ERC20, ReentrancyGuard {
     ERC20 public tokenX;
     ERC20 public tokenY;
     ERC20 public lpToken;
@@ -35,7 +36,7 @@ contract Dex is IDex, ERC20 {
      * @param tokenYAmount 토큰 Y의 수량
      * @param tokenMinimumOutputAmount 토큰 
      */
-    function addLiquidity(uint tokenXAmount, uint tokenYAmount, uint tokenMinimumOutputAmount) external override returns (uint) {
+    function addLiquidity(uint tokenXAmount, uint tokenYAmount, uint tokenMinimumOutputAmount) external override nonReentrant returns (uint) {
         require(tokenXAmount > 0 && tokenYAmount > 0, "Amounts must be greater than zero.");    // @Gamj4tang ✅ test
         
         uint lpTokenCreated;
@@ -58,15 +59,14 @@ contract Dex is IDex, ERC20 {
                 // L_x = X*P_x, L_y = Y*P_y (유동성 가치의 토큰 가치 비례) => P_x = L_x/X
                 liquidityX = _div(_mul(tokenXAmount, totalLiquidity), tokenXReserve);
                 liquidityY = _div(_mul(tokenYAmount, totalLiquidity), tokenYReserve);
-                // console.log("liquidityX: %s", liquidityX);  
-                // console.log("liquidityY: %s", liquidityY);
+    
+    
             }
             // 최소 수량 유동성 공급 검증
             lpTokenCreated = (liquidityX < liquidityY) ? liquidityX : liquidityY;
             require(lpTokenCreated >= tokenMinimumOutputAmount, "Minimum liquidity not met."); // @Gamj4tang ✅ test
             totalLiquidity += lpTokenCreated;
         }
-        // console.log("lpTokenCreated: %s", lpTokenCreated);
 
         liquidity[msg.sender] += lpTokenCreated;
         tokenX.transferFrom(msg.sender, address(this), tokenXAmount);
@@ -86,7 +86,7 @@ contract Dex is IDex, ERC20 {
      * @return 토큰 공급량 
      * @return 
      */
-    function removeLiquidity(uint LPTokenAmount, uint minimumTokenXAmount, uint minimumTokenYAmount) external override returns (uint, uint) {
+    function removeLiquidity(uint LPTokenAmount, uint minimumTokenXAmount, uint minimumTokenYAmount) external override nonReentrant returns (uint, uint) {
         require(LPTokenAmount > 0, "Amounts must be greater than zero.");    // @Gamj4tang ✅ test
         require(liquidity[msg.sender] >= LPTokenAmount, "Insufficient liquidity."); // @Gamj4tang ✅ test
         // 유동성 기반 토큰 가격, => P_x = L_x/X ,  P_y = L_y/Y 
@@ -116,8 +116,8 @@ contract Dex is IDex, ERC20 {
      * @param tokenYAmount 토큰 Y의 수량
      * @param tokenMinimumOutputAmount 최소 토큰 출력 수량
      */
-    function swap(uint tokenXAmount, uint tokenYAmount, uint tokenMinimumOutputAmount) external override returns (uint) {
-        require(tokenXAmount > 0 || tokenYAmount > 0, "Amounts must be greater than zero."); // @Gamj4tang ✅ test
+    function swap(uint tokenXAmount, uint tokenYAmount, uint tokenMinimumOutputAmount) external override nonReentrant returns (uint) {
+        require(tokenXAmount >= 0 || tokenYAmount >= 0, "Amounts must be greater than zero."); // @Gamj4tang ✅ test
         require(tokenXAmount == 0 || tokenYAmount == 0, "Only one token can be swapped at a time."); // @Gamj4tang ✅ test
     
         uint inputAmount;
@@ -141,11 +141,8 @@ contract Dex is IDex, ERC20 {
 
         // Protocol Fee: 0.1% check (Pi = 0.1% ( = 10 bp) = ø = 0.999 = 99.9% )
         uint amountInMulFee = _mul(inputAmount, (999));
-        // console.log("amountInMulFee: %s", amountInMulFee);
         uint nm = _mul(amountInMulFee, (outputReserve));
         uint dm = _add(_mul(inputReserve, 1000), amountInMulFee);
-        // console.log("nm: %s", nm);
-        // console.log("dm: %s", dm);
 
         outputAmount = _div(nm, dm);
 
