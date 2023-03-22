@@ -21,7 +21,7 @@ contract Dex is IDex, ERC20, ReentrancyGuard {
     uint8 constant TOKEN_DECIMALS = 18;
 
     uint public totalLiquidity;
-    mapping(address => uint) public liquidity; // @Gamj4tang 사용자 유동성 추적용
+    mapping(address => uint) public liquidity; 
 
     constructor(address _tokenX, address _tokenY) ERC20("LPToken", "LPT")  {
         tokenX = ERC20(_tokenX);
@@ -37,7 +37,13 @@ contract Dex is IDex, ERC20, ReentrancyGuard {
      * @param tokenMinimumOutputAmount 토큰 
      */
     function addLiquidity(uint tokenXAmount, uint tokenYAmount, uint tokenMinimumOutputAmount) external override nonReentrant returns (uint) {
-        require(tokenXAmount > 0 && tokenYAmount > 0, "Amounts must be greater than zero.");    // @Gamj4tang ✅ test
+        require(tokenXAmount > 0 && tokenYAmount > 0, "Amounts must be greater than zero.");    
+        require(tokenX.allowance(msg.sender, address(this)) >= tokenXAmount, "ERC20: insufficient allowance");
+        require(tokenY.allowance(msg.sender, address(this)) >= tokenYAmount, "ERC20: insufficient allowance");
+        require(tokenX.balanceOf(msg.sender) >= tokenXAmount, "ERC20: transfer amount exceeds balance");
+        require(tokenY.balanceOf(msg.sender) >= tokenYAmount, "ERC20: transfer amount exceeds balance");
+        
+
         
         uint lpTokenCreated;
         uint tokenXReserve;
@@ -47,15 +53,15 @@ contract Dex is IDex, ERC20, ReentrancyGuard {
 
         if (totalLiquidity == 0) {
             // 정밀도 
-            lpTokenCreated = _sqrt(tokenXAmount * tokenYAmount); // @Gamj4tang CPMM 모델 기반 a:b = b:√(a*b), 따로 유틸 로?
-            require(lpTokenCreated >= tokenMinimumOutputAmount, "Minimum liquidity not met."); // @Gamj4tang ✅ test
+            lpTokenCreated = _sqrt(tokenXAmount * tokenYAmount); 
+            require(lpTokenCreated >= tokenMinimumOutputAmount, "Minimum liquidity not met."); 
             totalLiquidity = lpTokenCreated;
         } else {
             {
                 tokenXReserve = tokenX.balanceOf(address(this));
                 tokenYReserve = tokenY.balanceOf(address(this));
             
-                // @Gamj4tang 정수 취약성 추가 검중?, 유동성 비례 b:√(a*b) 계산 
+                
                 // L_x = X*P_x, L_y = Y*P_y (유동성 가치의 토큰 가치 비례) => P_x = L_x/X
                 liquidityX = _div(_mul(tokenXAmount, totalLiquidity), tokenXReserve);
                 liquidityY = _div(_mul(tokenYAmount, totalLiquidity), tokenYReserve);
@@ -64,7 +70,7 @@ contract Dex is IDex, ERC20, ReentrancyGuard {
             }
             // 최소 수량 유동성 공급 검증
             lpTokenCreated = (liquidityX < liquidityY) ? liquidityX : liquidityY;
-            require(lpTokenCreated >= tokenMinimumOutputAmount, "Minimum liquidity not met."); // @Gamj4tang ✅ test
+            require(lpTokenCreated >= tokenMinimumOutputAmount, "Minimum liquidity not met."); 
             totalLiquidity += lpTokenCreated;
         }
 
@@ -74,7 +80,7 @@ contract Dex is IDex, ERC20, ReentrancyGuard {
 
         transfer(msg.sender, lpTokenCreated);
         emit AddLiquidity(msg.sender, tokenXAmount, tokenYAmount);
-        // @Gamj4tang 유동성 공급시 LP 토큰이 CPMM 모델 구조에 따라 비율 검증, 유동성 공금, 프로토콜 도네일 경우만 유동성 공급 처리 
+        
         return lpTokenCreated;
     }
 
@@ -87,14 +93,15 @@ contract Dex is IDex, ERC20, ReentrancyGuard {
      * @return 
      */
     function removeLiquidity(uint LPTokenAmount, uint minimumTokenXAmount, uint minimumTokenYAmount) external override nonReentrant returns (uint, uint) {
-        require(LPTokenAmount > 0, "Amounts must be greater than zero.");    // @Gamj4tang ✅ test
-        require(liquidity[msg.sender] >= LPTokenAmount, "Insufficient liquidity."); // @Gamj4tang ✅ test
-        // 유동성 기반 토큰 가격, => P_x = L_x/X ,  P_y = L_y/Y 
+        require(LPTokenAmount > 0, "Amounts must be greater than zero.");    
+        require(liquidity[msg.sender] >= LPTokenAmount, "fficient liquidity."); 
+        require(lpToken.balanceOf(msg.sender) >= LPTokenAmount, "Insufficient token."); 
+        // 유동성 기반 토큰 가격, => P_x = L_x/X ,  P_y = L_y/Y Insu
         uint tokenXAmount = _div(_mul(LPTokenAmount, tokenX.balanceOf(address(this))), totalLiquidity); // $(\sqrt{(t_x * t_y)} *t_x) / total(t_x) = LP_x$ => 토큰 페어 검증 조건 성립, 계산
         uint tokenYAmount = _div(_mul(LPTokenAmount, tokenY.balanceOf(address(this))), totalLiquidity); // $t_x = (LP*total_{t_x}) / LP_f)$, $t_y = (LP*total_{t_y}) / LP_f)$
-        require(tokenXAmount >= minimumTokenXAmount && tokenYAmount >= minimumTokenYAmount, "Minimum liquidity not met."); // @Gamj4tang ✅ test
+        require(tokenXAmount >= minimumTokenXAmount && tokenYAmount >= minimumTokenYAmount, "Minimum liquidity not met."); 
 
-        liquidity[msg.sender] -= LPTokenAmount; // @Gamj4tang 사용자 유동성 추적 상태 업데이트
+        liquidity[msg.sender] -= LPTokenAmount; 
         totalLiquidity -= LPTokenAmount;    // 전체 유동성 업데이트
 
         tokenX.transfer(msg.sender, tokenXAmount);
@@ -117,8 +124,9 @@ contract Dex is IDex, ERC20, ReentrancyGuard {
      * @param tokenMinimumOutputAmount 최소 토큰 출력 수량
      */
     function swap(uint tokenXAmount, uint tokenYAmount, uint tokenMinimumOutputAmount) external override nonReentrant returns (uint) {
-        require(tokenXAmount >= 0 || tokenYAmount >= 0, "Amounts must be greater than zero."); // @Gamj4tang ✅ test
-        require(tokenXAmount == 0 || tokenYAmount == 0, "Only one token can be swapped at a time."); // @Gamj4tang ✅ test
+        require(tokenXAmount >= 0 || tokenYAmount >= 0, "Amounts must be greater than zero."); 
+        require(tokenXAmount == 0 || tokenYAmount == 0, "Only one token can be swapped at a time."); 
+        
     
         uint inputAmount;
         uint outputAmount;
