@@ -44,7 +44,6 @@ contract Dex is IDex, ERC20, ReentrancyGuard {
         require(tokenY.balanceOf(msg.sender) >= tokenYAmount, "ERC20: transfer amount exceeds balance");
         
 
-        
         uint lpTokenCreated;
         uint tokenXReserve;
         uint tokenYReserve;
@@ -58,9 +57,16 @@ contract Dex is IDex, ERC20, ReentrancyGuard {
             totalLiquidity = lpTokenCreated;
         } else {
             {
+
+                
                 tokenXReserve = tokenX.balanceOf(address(this));
                 tokenYReserve = tokenY.balanceOf(address(this));
-            
+
+                console.log("tokenX_in_LP: %s", tokenXReserve);
+                console.log("tokenY_in_LP: %s", tokenYReserve);
+                console.log("tokenXAmount: %s", tokenXAmount);
+                console.log("tokenYAmount: %s", tokenYAmount);
+                // console.log("totalSupply: %s", totalSupply());
                 
                 // L_x = X*P_x, L_y = Y*P_y (유동성 가치의 토큰 가치 비례) => P_x = L_x/X
                 liquidityX = _div(_mul(tokenXAmount, totalLiquidity), tokenXReserve);
