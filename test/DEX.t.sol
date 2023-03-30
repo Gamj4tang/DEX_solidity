@@ -383,7 +383,7 @@ contract DexTest is Test {
     
         uint lpFee = 100 ether + 999 * 1000;
         vm.stopPrank();
-    
+
         vm.startPrank(attacker2);
         tokenX.approve(address(dex), 100 ether);
         for (uint i = 0; i < 1000; i++) {
